@@ -1,1 +1,267 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Safety Inspector</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        darkblue: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { transition: background-color 0.3s, color 0.3s; }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-slate-800 dark:bg-darkblue-900 dark:text-gray-100 min-h-screen flex flex-col">
+
+    <nav class="w-full pt-12 pb-6 px-6 max-w-6xl mx-auto grid grid-cols-3 items-center">
+        
+        <div></div>
+
+        <div class="text-center">
+            <h1 class="text-3xl font-extrabold tracking-tight">
+                Billboard<span class="text-blue-600 dark:text-blue-400"> Inspector</span>
+            </h1>
+        </div>
+        
+        <div class="flex justify-end">
+            <button onclick="toggleTheme()" class="w-10 h-10 rounded-full bg-white dark:bg-darkblue-800 shadow-md flex items-center justify-center hover:scale-110 transition-transform text-slate-600 dark:text-yellow-400 border border-gray-200 dark:border-darkblue-700">
+                <i id="theme-icon" class="fa-solid fa-moon"></i>
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow w-full max-w-4xl mx-auto p-6">
+
+        <div class="bg-white dark:bg-darkblue-800 rounded-2xl shadow-xl border border-gray-100 dark:border-darkblue-700 overflow-hidden relative transition-all duration-300">
+            <div class="p-8">
+                
+                <h2 class="text-center text-xl font-semibold mb-6 text-gray-600 dark:text-gray-300">Upload Billboard Image for Inspection</h2>
+
+                <div onclick="document.getElementById('fileInput').click()" 
+                     class="group relative w-full h-64 border-2 border-dashed border-gray-300 dark:border-darkblue-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-darkblue-900/50 transition-all duration-300">
+                    
+                    <input type="file" id="fileInput" class="hidden" accept="image/*" onchange="handleFileSelect(event)">
+                    
+                    <div id="upload-placeholder" class="text-center">
+                        <div class="w-16 h-16 bg-blue-100 dark:bg-darkblue-900 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                        </div>
+                        <p class="text-gray-500 dark:text-gray-400 font-medium">Click to upload or drag & drop</p>
+                        <p class="text-xs text-gray-400 mt-2"></p>
+                    </div>
+
+                    <img id="image-preview" class="hidden absolute inset-0 w-full h-full object-contain p-2 rounded-xl" />
+                </div>
+
+                <button id="analyzeBtn" onclick="analyzeImage()" disabled
+                    class="w-full mt-6 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                    <i class="fa-solid fa-microchip mr-2"></i> Run AI Analysis
+                </button>
+            </div>
+            
+            <div id="loader" class="hidden absolute inset-0 bg-white/80 dark:bg-darkblue-900/90 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
+                <p class="text-blue-600 dark:text-blue-400 font-semibold animate-pulse">Running 5 AI Models...</p>
+                <p class="text-xs text-gray-500 mt-2">Checking Alcohol, Tobacco, NSFW, Profanity & Damage</p>
+            </div>
+        </div>
+
+        <div id="resultsArea" class="hidden mt-8 space-y-6 fade-in">
+            
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div id="card-alc" class="bg-white dark:bg-darkblue-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-darkblue-700 flex flex-col items-center justify-center text-center transition-all">
+                    <i class="fa-solid fa-beer-mug-empty text-2xl mb-2 text-gray-400" id="icon-alc"></i>
+                    <span class="text-xs uppercase tracking-wider font-semibold text-gray-500">Alcohol</span>
+                    <span id="status-alc" class="font-bold mt-1 text-sm">Checking...</span>
+                </div>
+                <div id="card-tob" class="bg-white dark:bg-darkblue-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-darkblue-700 flex flex-col items-center justify-center text-center transition-all">
+                    <i class="fa-solid fa-smoking text-2xl mb-2 text-gray-400" id="icon-tob"></i>
+                    <span class="text-xs uppercase tracking-wider font-semibold text-gray-500">Tobacco</span>
+                    <span id="status-tob" class="font-bold mt-1 text-sm">Checking...</span>
+                </div>
+                <div id="card-prof" class="bg-white dark:bg-darkblue-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-darkblue-700 flex flex-col items-center justify-center text-center transition-all">
+                    <i class="fa-solid fa-poop text-2xl mb-2 text-gray-400" id="icon-prof"></i>
+                    <span class="text-xs uppercase tracking-wider font-semibold text-gray-500">Profanity</span>
+                    <span id="status-prof" class="font-bold mt-1 text-sm">Checking...</span>
+                </div>
+                <div id="card-nsfw" class="bg-white dark:bg-darkblue-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-darkblue-700 flex flex-col items-center justify-center text-center transition-all">
+                    <i class="fa-solid fa-eye-slash text-2xl mb-2 text-gray-400" id="icon-nsfw"></i>
+                    <span class="text-xs uppercase tracking-wider font-semibold text-gray-500">NSFW</span>
+                    <span id="status-nsfw" class="font-bold mt-1 text-sm">Checking...</span>
+                </div>
+                <div id="card-struct" class="bg-white dark:bg-darkblue-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-darkblue-700 flex flex-col items-center justify-center text-center transition-all">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 text-gray-400" id="icon-struct"></i>
+                    <span class="text-xs uppercase tracking-wider font-semibold text-gray-500">Damage</span>
+                    <span id="status-struct" class="font-bold mt-1 text-sm">Checking...</span>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-darkblue-800 rounded-xl shadow-lg border-l-4 border-blue-500 p-6">
+                <h3 class="flex items-center gap-2 text-lg font-bold text-gray-800 dark:text-white mb-3">
+                    <i class="fa-solid fa-robot text-blue-500"></i> AI Visual Report
+                </h3>
+                <p id="desc-text" class="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Waiting for analysis...
+                </p>
+            </div>
+
+            <div id="verdict-banner" class="rounded-xl p-6 text-center shadow-lg transition-all duration-500">
+                <h2 id="verdict-title" class="text-3xl font-extrabold uppercase tracking-widest text-white mb-2">SAFE</h2>
+                <p id="verdict-reason" class="text-white/90 text-sm font-medium">No violations detected.</p>
+            </div>
+
+        </div>
+    </main>
+    
+    <footer class="text-center p-6 text-gray-400 text-sm">
+      
+    </footer>
+
+    <script>
+        let selectedFile = null;
+
+        // Theme Toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+            } else {
+                html.classList.add('dark');
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+            }
+        }
+
+        // File Selection & Preview
+        function handleFileSelect(event) {
+            const input = event.target;
+            if(input.files && input.files[0]) {
+                selectedFile = input.files[0];
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('image-preview');
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                    document.getElementById('upload-placeholder').classList.add('opacity-0');
+                }
+                reader.readAsDataURL(selectedFile);
+
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('resultsArea').classList.add('hidden');
+            }
+        }
+
+        // AI Analysis Call
+        async function analyzeImage() {
+            if(!selectedFile) return;
+
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('analyzeBtn').disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('/analyze', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if(data.error) {
+                    alert("Error: " + data.error);
+                } else {
+                    displayResults(data);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Connection Error. Is Flask running?");
+            } finally {
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+
+        // Display Results
+        function displayResults(data) {
+            const resultsArea = document.getElementById('resultsArea');
+            resultsArea.classList.remove('hidden');
+            resultsArea.scrollIntoView({ behavior: 'smooth' });
+
+            updateCard('alc', data.flags.alcohol, 'fa-beer-mug-empty');
+            updateCard('tob', data.flags.tobacco, 'fa-smoking');
+            updateCard('prof', data.flags.profanity, 'fa-poop');
+            updateCard('nsfw', data.flags.nsfw, 'fa-eye-slash');
+            updateCard('struct', data.flags.structure_damage, 'fa-triangle-exclamation');
+
+            document.getElementById('desc-text').innerText = data.description;
+
+            const banner = document.getElementById('verdict-banner');
+            const title = document.getElementById('verdict-title');
+            const reason = document.getElementById('verdict-reason');
+            
+            title.innerText = data.verdict.status;
+            
+            if (data.verdict.reasons.length > 0) {
+                reason.innerText = data.verdict.reasons.join(" • ");
+            } else {
+                reason.innerText = "This billboard is compliant and safe.";
+            }
+
+            banner.className = "rounded-xl p-6 text-center shadow-lg transition-all duration-500 mt-4";
+            if (data.verdict.color === 'red') {
+                banner.classList.add('bg-gradient-to-r', 'from-red-600', 'to-pink-600');
+            } else if (data.verdict.color === 'orange') {
+                banner.classList.add('bg-gradient-to-r', 'from-orange-500', 'to-red-500');
+            } else {
+                banner.classList.add('bg-gradient-to-r', 'from-green-500', 'to-emerald-600');
+            }
+        }
+
+        function updateCard(id, isDetected, iconClass) {
+            const card = document.getElementById(`card-${id}`);
+            const statusText = document.getElementById(`status-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+
+            card.className = "p-4 rounded-xl shadow-sm border flex flex-col items-center justify-center text-center transition-all duration-300";
+            icon.className = `fa-solid ${iconClass} text-2xl mb-2`;
+
+            if (isDetected) {
+                card.classList.add('bg-red-50', 'dark:bg-red-900/20', 'border-red-200', 'dark:border-red-800');
+                icon.classList.add('text-red-500');
+                statusText.innerText = "DETECTED";
+                statusText.className = "font-bold mt-1 text-sm text-red-600 dark:text-red-400";
+            } else {
+                card.classList.add('bg-green-50', 'dark:bg-green-900/20', 'border-green-200', 'dark:border-green-800');
+                icon.classList.add('text-green-500');
+                statusText.innerText = "NONE";
+                statusText.className = "font-bold mt-1 text-sm text-green-600 dark:text-green-400";
+            }
+        }
+    </script>
+</body>
+</html>
